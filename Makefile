@@ -1,4 +1,4 @@
-.PHONY: help install install-nvim install-tmux clean uninstall
+.PHONY: help install install-nvim install-tmux clean uninstall check-nvim check-tmux
 
 # Get current directory path
 NVIM_REPO := $(shell pwd)
@@ -23,54 +23,84 @@ install: install-nvim install-tmux
 
 install-nvim: check-nvim
 	@echo "📦 Installing nvim configuration..."
-	@mkdir -p $(NVIM_CONFIG)
-	@if [ -e $(NVIM_CONFIG) ] && [ ! -d $(NVIM_CONFIG) ]; then \
-		echo "⚠️  $(NVIM_CONFIG) is a file, backed up to $(NVIM_CONFIG).bak"; \
-		mv $(NVIM_CONFIG) $(NVIM_CONFIG).bak; \
-	elif [ -d $(NVIM_CONFIG) ]; then \
+	@if [ "$(NVIM_REPO)" = "$(NVIM_CONFIG)" ]; then \
+		echo "✅ Already running from $(NVIM_CONFIG), nothing to do"; \
+	elif [ -L "$(NVIM_CONFIG)" ]; then \
+		echo "⚠️  Removing existing symlink at $(NVIM_CONFIG)"; \
+		rm "$(NVIM_CONFIG)"; \
+		ln -s "$(NVIM_REPO)" "$(NVIM_CONFIG)"; \
+		echo "✅ Symlink updated: $(NVIM_CONFIG) -> $(NVIM_REPO)"; \
+	elif [ -d "$(NVIM_CONFIG)" ]; then \
 		echo "⚠️  $(NVIM_CONFIG) exists, backed up to $(NVIM_CONFIG).bak"; \
-		mv $(NVIM_CONFIG) $(NVIM_CONFIG).bak; \
+		mv "$(NVIM_CONFIG)" "$(NVIM_CONFIG).bak"; \
+		ln -s "$(NVIM_REPO)" "$(NVIM_CONFIG)"; \
+		echo "✅ Symlink created: $(NVIM_CONFIG) -> $(NVIM_REPO)"; \
+	elif [ -e "$(NVIM_CONFIG)" ]; then \
+		echo "⚠️  $(NVIM_CONFIG) is a file, backed up to $(NVIM_CONFIG).bak"; \
+		mv "$(NVIM_CONFIG)" "$(NVIM_CONFIG).bak"; \
+		ln -s "$(NVIM_REPO)" "$(NVIM_CONFIG)"; \
+		echo "✅ Symlink created: $(NVIM_CONFIG) -> $(NVIM_REPO)"; \
+	else \
+		mkdir -p "$(HOME)/.config"; \
+		ln -s "$(NVIM_REPO)" "$(NVIM_CONFIG)"; \
+		echo "✅ Symlink created: $(NVIM_CONFIG) -> $(NVIM_REPO)"; \
 	fi
-	@cp -r $(NVIM_REPO) $(NVIM_CONFIG)
-	@echo "✅ nvim configuration installed to $(NVIM_CONFIG)"
 	@echo ""
 
-install-tmux:
+install-tmux: check-tmux
 	@echo "📦 Installing tmux configuration..."
-	@if [ -e $(TMUX_CONFIG) ]; then \
+	@if [ -L "$(TMUX_CONFIG)" ]; then \
+		echo "⚠️  Removing existing symlink at $(TMUX_CONFIG)"; \
+		rm "$(TMUX_CONFIG)"; \
+	elif [ -e "$(TMUX_CONFIG)" ]; then \
 		echo "⚠️  $(TMUX_CONFIG) exists, backed up to $(TMUX_CONFIG).bak"; \
-		mv $(TMUX_CONFIG) $(TMUX_CONFIG).bak; \
+		mv "$(TMUX_CONFIG)" "$(TMUX_CONFIG).bak"; \
 	fi
-	@cp $(NVIM_REPO)/rcfiles/tmux.conf $(TMUX_CONFIG)
-	@echo "✅ tmux configuration installed to $(TMUX_CONFIG)"
+	@ln -s "$(NVIM_REPO)/rcfiles/tmux.conf" "$(TMUX_CONFIG)"
+	@echo "✅ Symlink created: $(TMUX_CONFIG) -> $(NVIM_REPO)/rcfiles/tmux.conf"
 	@echo ""
 
 check-nvim:
-	@if ! command -v nvim &> /dev/null; then \
+	@if ! command -v nvim > /dev/null 2>&1; then \
 		echo "❌ Error: nvim not installed"; \
 		echo "Please install neovim first: https://github.com/neovim/neovim"; \
 		exit 1; \
 	else \
-		echo "✅ nvim detected"; \
+		echo "✅ nvim detected: $$(nvim --version | head -1)"; \
+	fi
+
+check-tmux:
+	@if ! command -v tmux > /dev/null 2>&1; then \
+		echo "❌ Error: tmux not installed"; \
+		echo "Install via: brew install tmux  (macOS) or  apt install tmux  (Linux)"; \
+		exit 1; \
+	else \
+		echo "✅ tmux detected: $$(tmux -V)"; \
 	fi
 
 uninstall:
 	@echo "🗑️  Uninstalling nvim and tmux configuration..."
-	@if [ -d $(NVIM_CONFIG) ]; then \
-		rm -rf $(NVIM_CONFIG); \
-		echo "✅ nvim configuration removed"; \
+	@if [ -L "$(NVIM_CONFIG)" ]; then \
+		rm "$(NVIM_CONFIG)"; \
+		echo "✅ nvim symlink removed"; \
+	elif [ -d "$(NVIM_CONFIG)" ]; then \
+		echo "⚠️  $(NVIM_CONFIG) is a real directory, not a symlink — skipping to avoid data loss"; \
+		echo "   Remove manually if intended: rm -rf $(NVIM_CONFIG)"; \
 	fi
-	@if [ -f $(TMUX_CONFIG) ]; then \
-		rm $(TMUX_CONFIG); \
-		echo "✅ tmux configuration removed"; \
+	@if [ -L "$(TMUX_CONFIG)" ]; then \
+		rm "$(TMUX_CONFIG)"; \
+		echo "✅ tmux symlink removed"; \
+	elif [ -f "$(TMUX_CONFIG)" ]; then \
+		echo "⚠️  $(TMUX_CONFIG) is a real file, not a symlink — skipping to avoid data loss"; \
+		echo "   Remove manually if intended: rm $(TMUX_CONFIG)"; \
 	fi
 	@echo ""
 
 clean:
 	@echo "🧹 Cleaning temporary files..."
-	@find $(NVIM_REPO) -name "*.swp" -delete
-	@find $(NVIM_REPO) -name "*.swo" -delete
-	@find $(NVIM_REPO) -name ".DS_Store" -delete
+	@find "$(NVIM_REPO)" -name "*.swp" -delete
+	@find "$(NVIM_REPO)" -name "*.swo" -delete
+	@find "$(NVIM_REPO)" -name ".DS_Store" -delete
 	@echo "✅ Clean completed"
 	@echo ""
 
