@@ -2,7 +2,7 @@
 local is_vscode = vim.g.vscode ~= nil
 
 if is_vscode then
-  require("vscode")
+  require("config.vscode")
 else
   require("config.options")
   require("config.lazy")
